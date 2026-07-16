@@ -8,109 +8,52 @@
     :root { color-scheme: light dark; }
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
     h1 { margin-bottom: .25rem; }
-    #auth { display: flex; align-items: center; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; }
-    #userEmail { font-weight: 600; }
     form { display: flex; gap: .5rem; margin: 1rem 0; }
     textarea { flex: 1; padding: .6rem; font: inherit; resize: vertical; min-height: 3rem; }
     button { padding: .6rem 1rem; font: inherit; cursor: pointer; }
     #status { min-height: 1.2rem; color: #c0392b; font-size: .9rem; }
-    #loginNotice { color: #666; font-size: .9rem; margin: 1rem 0; }
     ul { list-style: none; padding: 0; }
     li { border: 1px solid #ccc; border-radius: 8px; padding: .75rem; margin-bottom: .5rem; display: flex; justify-content: space-between; gap: .5rem; }
     .content { white-space: pre-wrap; word-break: break-word; }
     .meta { color: #888; font-size: .8rem; margin-top: .35rem; }
     .del { background: transparent; border: none; color: #c0392b; font-size: 1.1rem; align-self: flex-start; }
-    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
   <h1>방명록</h1>
   <p>글을 남기면 백엔드(Render)를 거쳐 DB(Supabase)에 저장됩니다.</p>
 
-  <!-- 로그인 영역 -->
-  <div id="auth">
-    <button id="loginBtn" type="button">Google로 로그인</button>
-    <span id="userEmail" hidden></span>
-    <button id="logoutBtn" type="button" hidden>로그아웃</button>
-  </div>
-
-  <!-- 글쓰기 폼 (로그인해야 보임) -->
-  <form id="form" hidden>
+  <!-- 글쓰기 폼 -->
+  <form id="form">
     <textarea id="input" maxlength="500" placeholder="메시지를 남겨보세요 (최대 500자)" required></textarea>
     <button type="submit">남기기</button>
   </form>
-  <p id="loginNotice">✍️ 글을 쓰려면 먼저 로그인하세요. (읽기는 로그인 없이 가능)</p>
 
   <div id="status"></div>
   <ul id="list"></ul>
 
   <script type="module">
     // ==========================================================
-    //  방명록 프론트엔드 (Google 로그인 포함)
-    //  - DB에 직접 접근하지 않고, 백엔드 API(Render)만 호출합니다.
-    //  - 로그인만 supabase-js 로 직접 처리합니다(브라우저용 anon 키 사용, 노출돼도 안전).
-    //  코드를 [1]~[7] 순서로 뜯어보세요.
+    //  방명록 프론트엔드 (로그인 없는 공개 버전)
+    //  - 이 페이지는 DB에 "직접" 접근하지 않습니다.
+    //  - 오직 백엔드 API(Render) 만 fetch 로 호출합니다.
+    //  - 그래서 여기엔 어떤 비밀 키도 없습니다. (설계상 안전)
+    //  코드를 [1]~[6] 순서로 뜯어보세요.
     // ==========================================================
-    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-    // ---- [1] 연결 설정 : 본인 값 3개로 바꾸세요 ----
-    const SUPABASE_URL  = "https://여기에-supabase-url.supabase.co"; // Project URL
-    const SUPABASE_ANON_KEY = "여기에-anon(publishable)-키";          // anon 키(공개용, 노출 OK)
-    const API_BASE_URL  = "https://여기에-render-주소.onrender.com";  // Render 백엔드 주소(끝에 / 없이)
+    // ---- [1] 연결 설정 : 이 한 줄만 본인 Render 주소로 바꾸면 됩니다 ----
+    //  Render 배포 후 받는 주소. 예: https://guestbook-api-xxxx.onrender.com
+    //  끝에 슬래시(/) 붙이지 마세요.
+    const API_BASE_URL = "https://여기에-render-주소.onrender.com";
 
-    // 로그인 전용 Supabase 클라이언트 (DB 접근용 아님)
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // ---- [2] 화면 요소 잡기 + 상태 표시 ----
-    const loginBtn  = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const userEmail = document.getElementById("userEmail");
-    const form      = document.getElementById("form");
-    const notice    = document.getElementById("loginNotice");
-    const input     = document.getElementById("input");
-    const list      = document.getElementById("list");
-    const status    = document.getElementById("status");
+    // ---- [2] 화면 요소 잡기 + 상태 표시 헬퍼 ----
+    const form   = document.getElementById("form");
+    const input  = document.getElementById("input");
+    const list   = document.getElementById("list");
+    const status = document.getElementById("status");
     const setStatus = (msg) => { status.textContent = msg; };
 
-    let currentUser = null; // 지금 로그인한 사용자 (없으면 null)
-
-    // ---- [3] 로그인 / 로그아웃 (Google OAuth) ----
-    loginBtn.addEventListener("click", async () => {
-      // Google 로그인 창으로 이동 → 끝나면 이 페이지로 다시 돌아옵니다.
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: window.location.href },
-      });
-    });
-    logoutBtn.addEventListener("click", async () => {
-      await supabase.auth.signOut();
-    });
-
-    // 로그인 상태가 바뀔 때마다(로그인/로그아웃/새로고침) 화면 갱신
-    supabase.auth.onAuthStateChange((_event, session) => {
-      currentUser = session?.user ?? null;
-      updateAuthUI();
-      load(); // 목록 다시 그려서 "내 글" 삭제 버튼 반영
-    });
-
-    function updateAuthUI() {
-      const loggedIn = !!currentUser;
-      loginBtn.hidden  = loggedIn;
-      logoutBtn.hidden = !loggedIn;
-      userEmail.hidden = !loggedIn;
-      form.hidden      = !loggedIn;
-      notice.hidden    = loggedIn;
-      userEmail.textContent = loggedIn ? currentUser.email : "";
-    }
-
-    // 로그인된 경우, API 호출에 붙일 인증 헤더를 만듭니다.
-    async function authHeader() {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      return token ? { Authorization: `Bearer ${token}` } : {};
-    }
-
-    // ---- [4] READ : 목록 불러오기 (로그인 없이 가능) ----
+    // ---- [3] READ : 목록 불러오기 ----
     async function load() {
       setStatus("불러오는 중…");
       try {
@@ -123,7 +66,9 @@
       }
     }
 
-    // ---- [5] 그리기 : 사용자 글은 textContent 로만! (XSS 방지) ----
+    // ---- [4] 그리기 : 사용자 글은 textContent 로만! (XSS 방지) ----
+    //  innerHTML 을 쓰면 누가 <script> 를 남겼을 때 코드로 실행될 수 있습니다.
+    //  textContent 는 무조건 "글자"로만 취급하므로 안전합니다.
     function render(messages) {
       list.innerHTML = "";
       for (const m of messages) {
@@ -135,35 +80,32 @@
         p.textContent = m.content;               // ← 핵심: 사용자 입력은 textContent
         const meta = document.createElement("div");
         meta.className = "meta";
-        const who = m.author_email ? `${m.author_email} · ` : "";
-        meta.textContent = who + new Date(m.created_at).toLocaleString("ko-KR");
+        meta.textContent = new Date(m.created_at).toLocaleString("ko-KR");
         box.append(p, meta);
-        li.appendChild(box);
 
-        // 삭제 버튼은 "내가 쓴 글"에만 표시 (인가)
-        if (currentUser && m.user_id === currentUser.id) {
-          const del = document.createElement("button");
-          del.className = "del";
-          del.type = "button";
-          del.textContent = "🗑";
-          del.title = "삭제";
-          del.addEventListener("click", () => remove(m.id));
-          li.appendChild(del);
-        }
+        // 삭제 버튼 (개선 기능) — 공개 버전이라 누구나 삭제 가능
+        const del = document.createElement("button");
+        del.className = "del";
+        del.type = "button";
+        del.textContent = "🗑";
+        del.title = "삭제";
+        del.addEventListener("click", () => remove(m.id));
+
+        li.append(box, del);
         list.appendChild(li);
       }
     }
 
-    // ---- [6] CREATE : 글 저장 (로그인 필요, 인증 헤더 포함) ----
+    // ---- [5] CREATE : 글 저장 ----
     form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+      e.preventDefault();                        // 폼 제출 시 새로고침 막기
       const content = input.value.trim();
       if (!content) return;
       setStatus("저장 중…");
       try {
         const res = await fetch(`${API_BASE_URL}/messages`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(await authHeader()) },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content }),
         });
         if (!res.ok) {
@@ -171,33 +113,26 @@
           throw new Error(error || `서버 오류 (${res.status})`);
         }
         input.value = "";
-        await load();
+        await load();                            // 저장 후 목록 새로고침
       } catch (err) {
         setStatus(`저장 실패: ${err.message}`);
       }
     });
 
-    // ---- [7] DELETE : 글 삭제 (로그인 필요, 본인 글만) ----
+    // ---- [6] DELETE : 글 삭제 ----
     async function remove(id) {
       if (!confirm("이 글을 삭제할까요?")) return;
       setStatus("삭제 중…");
       try {
-        const res = await fetch(`${API_BASE_URL}/messages/${id}`, {
-          method: "DELETE",
-          headers: { ...(await authHeader()) },
-        });
-        if (!res.ok) {
-          const { error } = await res.json().catch(() => ({}));
-          throw new Error(error || `서버 오류 (${res.status})`);
-        }
+        const res = await fetch(`${API_BASE_URL}/messages/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
         await load();
       } catch (err) {
         setStatus(`삭제 실패: ${err.message}`);
       }
     }
 
-    // 시작: 현재 로그인 상태를 반영하고 목록을 불러옵니다.
-    updateAuthUI();
+    // 페이지가 열리면 목록을 한 번 불러옵니다.
     load();
   </script>
 </body>
