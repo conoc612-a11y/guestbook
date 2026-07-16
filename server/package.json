@@ -1,0 +1,18 @@
+{
+  "name": "guestbook-api",
+  "version": "1.0.0",
+  "description": "방명록 백엔드 API (Render + Supabase)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --env-file=.env server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
