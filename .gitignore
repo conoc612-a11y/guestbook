@@ -6,6 +6,10 @@
 # 의존성
 node_modules/
 
+# chatbot/ 대용량·캐시 (dist/ 빌드 산출물은 GitHub Pages 배포용으로 커밋)
+chatbot/.model/
+chatbot/*.tsbuildinfo
+
 # OMC 운영 아티팩트
 .omc/
 
