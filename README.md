@@ -71,3 +71,8 @@ npm run dev               # http://localhost:3000
 ## 개선 기능 (과제 제출용)
 - **삭제 기능 구현됨**: 각 글의 🗑 버튼 → 백엔드 `DELETE /messages/:id` → DB 삭제.
 - 제출 한 줄 예: "글 삭제 기능 추가 (프론트 삭제 버튼 + 백엔드 DELETE 엔드포인트)".
+
+## 논문 가설 → 개선 실험 (모두의연구소)
+- **실험 보고서**: [`experiment/experiment-01.md`](experiment/experiment-01.md) — 중심문서
+- 가설: 프로젝트 메모리(CLAUDE.md)의 용어집 + 과업 복귀 절차가 없으면 원래 과업 목적을 잃는 불편을 줄이는가
+- 고정 입력 (fixture): [`experiment/experiment-01/fixture/`](experiment/experiment-01/fixture/)
